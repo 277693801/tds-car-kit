@@ -202,16 +202,30 @@ final class BrowserBridge {
     private func startOnQueue(port: UInt16) {
         do {
             let params = NWParameters.tcp
-            params.allowLocalEndpointReuse = true
-            let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port) ?? NWEndpoint.Port(8081))
-            listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
-            listener.stateUpdateHandler = { [weak self] state in
-                if case .failed(let error) = state {
-                    self?.onLog?("Browser bridge failed: \(error.localizedDescription)")
+            let candidate = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port) ?? .any)
+            candidate.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
+            candidate.stateUpdateHandler = { [weak self, weak candidate] state in
+                guard let self, let candidate else { return }
+                switch state {
+                case .ready:
+                    let actualPort = candidate.port?.rawValue ?? port
+                    let host = ReceiverConfiguration.localIPv4Addresses().first ?? "<设备IP>"
+                    self.onLog?("Browser display ready: http://\(host):\(actualPort)")
+                case .failed(let error):
+                    if case .posix(.EADDRINUSE) = error {
+                        self.onLog?("Browser bridge port \(port) is busy; using a free port")
+                        candidate.cancel()
+                        self.listener = nil
+                        self.startOnQueue(port: 0)
+                    } else {
+                        self.onLog?("Browser bridge failed: \(error.localizedDescription)")
+                    }
+                default:
+                    break
                 }
             }
-            self.listener = listener
-            listener.start(queue: queue)
+            self.listener = candidate
+            candidate.start(queue: queue)
         } catch {
             onLog?("Browser bridge failed: \(error.localizedDescription)")
         }
