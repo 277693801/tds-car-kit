@@ -1,0 +1,24 @@
+name: Build TrollStore IPA (iOS 14.5)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and package IPA
+        run: bash Tools/build_ipa.sh
+        env:
+          IDENTITY_P7B_B64: ${{ secrets.IDENTITY_P7B_B64 }}
+          IDENTITY_LEAF_B64: ${{ secrets.IDENTITY_LEAF_B64 }}
+          IDENTITY_X963_B64: ${{ secrets.IDENTITY_X963_B64 }}
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TDSCarKit-TrollStore
+          path: TDSCarKit-TrollStore.ipa

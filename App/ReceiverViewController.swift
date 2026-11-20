@@ -4,6 +4,7 @@ import CoreLocation
 
 final class ReceiverViewController: UIViewController, CLLocationManagerDelegate {
     private let receiver = NativeReceiver()
+    private let browserBridge = BrowserBridge()
     private let bluetooth = BLEBootstrap()
     private let sameDevice = SameDeviceProbe()
     private let controlBrowser = CarPlayControlBrowser()
@@ -115,7 +116,13 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         modeControl.addTarget(self, action: #selector(modeChanged), for: .valueChanged)
         connectionHelp.font = .preferredFont(forTextStyle: .body)
         connectionHelp.textColor = .secondaryLabel; connectionHelp.numberOfLines = 0
-        receiverPicker.configuration = .bordered(); receiverPicker.showsMenuAsPrimaryAction = true
+        receiverPicker.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        receiverPicker.setTitleColor(.label, for: .normal)
+        receiverPicker.layer.borderWidth = 1
+        receiverPicker.layer.borderColor = UIColor.separator.cgColor
+        receiverPicker.layer.cornerRadius = 8
+        receiverPicker.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        receiverPicker.showsMenuAsPrimaryAction = true
         let stack = UIStackView(arrangedSubviews: [heading, explanation, statusLabel, connectionHelp, receiverPicker])
         settingsStack = UIStackView(arrangedSubviews: [modeControl, bluetoothSetupRow!] + networkFields)
         settingsStack.axis = .vertical; settingsStack.spacing = 16
@@ -156,10 +163,12 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         forgetPasswordButton.setTitle("Forget saved Wi-Fi password", for: .normal)
         forgetPasswordButton.addTarget(self, action: #selector(forgetWiFiPassword), for: .touchUpInside)
         settingsStack.addArrangedSubview(passwordStatus); settingsStack.addArrangedSubview(forgetPasswordButton)
-        startButton.configuration = .filled(); startButton.setTitle("Start receiver", for: .normal)
+        startButton.setTitle("Start receiver", for: .normal)
+        startButton.setTitleColor(.white, for: .normal)
+        startButton.backgroundColor = view.tintColor
+        startButton.layer.cornerRadius = 12
+        startButton.contentEdgeInsets = UIEdgeInsets(top: 18, left: 24, bottom: 18, right: 24)
         startButton.addTarget(self, action: #selector(toggleReceiver), for: .touchUpInside)
-        startButton.configuration?.cornerStyle = .large
-        startButton.configuration?.contentInsets = NSDirectionalEdgeInsets(top: 18, leading: 24, bottom: 18, trailing: 24)
         stack.addArrangedSubview(startButton)
         stack.addArrangedSubview(settingsStack)
         videoSurface.isHidden = true
@@ -200,6 +209,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             guard let self, self.running else { return }
             do {
                 try self.videoSurface.enqueue(accessUnit: data)
+                self.browserBridge.push(accessUnit: data)
                 self.videoSurface.isHidden = false
                 if !self.displayedVideo {
                     self.displayedVideo = true; self.statusLabel.text = "Receiving CarPlay video"
@@ -213,6 +223,12 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         videoSurface.onTouch = { [weak self] point, down in
             self?.receiver.touch(x: UInt16(clamping: Int(point.x)), y: UInt16(clamping: Int(point.y)), down: down)
         }
+        browserBridge.onLog = { [weak self] in self?.log($0) }
+        browserBridge.onTouch = { [weak self] x, y, down in
+            self?.receiver.touch(x: x, y: y, down: down)
+        }
+        browserBridge.start(port: 8081)
+        log("Browser display: open http://\(ReceiverConfiguration.localIPv4Addresses().first ?? "<IP>"):8081 in a browser on the same network")
         receiver.onFailure = { [weak self] in self?.stop() }
         bluetooth.onFailure = { [weak self] message in
             self?.stop()
@@ -231,7 +247,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             self.receiverPicker.setTitle(self.remoteTarget.map { "\($0.name) · \($0.address)" }
                 ?? (targets.isEmpty ? "Searching for iPad receivers…" : "Choose iPad receiver"), for: .normal)
             self.receiverPicker.menu = UIMenu(children: targets.map { target in
-                UIAction(title: target.name, subtitle: "\(target.address):\(target.port)") { [weak self] _ in
+                UIAction(title: target.name) { [weak self] _ in
                     self?.remoteTarget = target
                     self?.receiverPicker.setTitle("\(target.name) · \(target.address)", for: .normal)
                 }
@@ -315,8 +331,11 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         let container = UIView(); container.backgroundColor = .black; container.translatesAutoresizingMaskIntoConstraints = false
         fullscreenContainer = container; view.addSubview(container); container.addSubview(videoSurface)
         videoSurface.translatesAutoresizingMaskIntoConstraints = false
-        let settings = UIButton(type: .system); settings.configuration = .filled()
+        let settings = UIButton(type: .system)
         settings.setImage(UIImage(systemName: "gearshape.fill"), for: .normal)
+        settings.tintColor = .white
+        settings.backgroundColor = UIColor(white: 0.2, alpha: 0.8)
+        settings.layer.cornerRadius = 8
         settings.accessibilityLabel = "TDS Car Kit settings"
         settings.addTarget(self, action: #selector(showConnectionSettings), for: .touchUpInside)
         settings.translatesAutoresizingMaskIntoConstraints = false; container.addSubview(settings)
@@ -331,9 +350,11 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         navigationController?.setNavigationBarHidden(true, animated: false)
         setNeedsStatusBarAppearanceUpdate(); setNeedsUpdateOfHomeIndicatorAutoHidden()
         if UIDevice.current.userInterfaceIdiom == .pad {
-            setNeedsUpdateOfSupportedInterfaceOrientations()
-            view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations)) { [weak self] _ in
-                self?.log("Rotate the iPad to the selected orientation for the full-screen display")
+            if #available(iOS 16.0, *) {
+                setNeedsUpdateOfSupportedInterfaceOrientations()
+                view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations)) { [weak self] _ in
+                    self?.log("Rotate the iPad to the selected orientation for the full-screen display")
+                }
             }
         }
     }
@@ -345,7 +366,9 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         let index = contentStack.arrangedSubviews.firstIndex(of: fullscreenButton) ?? contentStack.arrangedSubviews.count
         contentStack.insertArrangedSubview(videoSurface, at: index); videoHeight.isActive = true
         navigationController?.setNavigationBarHidden(false, animated: false)
-        setNeedsUpdateOfSupportedInterfaceOrientations()
+        if #available(iOS 16.0, *) {
+            setNeedsUpdateOfSupportedInterfaceOrientations()
+        }
         setNeedsStatusBarAppearanceUpdate(); setNeedsUpdateOfHomeIndicatorAutoHidden()
     }
     @objc private func networkNameChanged() {
@@ -516,6 +539,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
     private func stop() {
         hideFullscreen(); fullscreenButton.isHidden = true
         displayedVideo = false; videoSurface.reset(); videoSurface.isHidden = true
+        browserBridge.reset()
         running = false; receiver.onListening = nil; bluetooth.stop(); sameDevice.stop(); controlBrowser.stop(); receiver.stop()
         receiverBrowser.stop()
         modeControl.isEnabled = true

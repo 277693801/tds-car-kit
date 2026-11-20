@@ -31,6 +31,7 @@
 		833464EA77819A148AFD0712 /* Sources/TDSCarKitCore/Vendor/BigInt/Exponentiation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5719D30F55870288C0A11ED5 /* Sources/TDSCarKitCore/Vendor/BigInt/Exponentiation.swift */; };
 		96464255CF8872AB2E77C476 /* Identity in Resources */ = {isa = PBXBuildFile; fileRef = 1DB089A9F84E14E95F11DCB5 /* Identity */; };
 		9AA8500AA5EED0F288E24FE1 /* App/BLEBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC063C47C1B6FBDC0FB3C93 /* App/BLEBootstrap.swift */; };
+		D11C6ABF50C922C2FE6BEAAE /* App/BrowserBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2537E300FE13185CA1E35981 /* App/BrowserBridge.swift */; };
 		9AF5D979E7B12194643944A8 /* Sources/TDSCarKitCore/Vendor/BigInt/Subtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F07457529665BF71BCFB327 /* Sources/TDSCarKitCore/Vendor/BigInt/Subtraction.swift */; };
 		9F528AAABF9E48D65C365D00 /* Sources/TDSCarKitCore/Vendor/BigInt/Addition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F46F5A37158CC505921FCE /* Sources/TDSCarKitCore/Vendor/BigInt/Addition.swift */; };
 		9FBA43FDA4A38A44D7B5DC03 /* Sources/TDSCarKitCore/Vendor/BigInt/Comparable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CE762103B75127055BD6BD1 /* Sources/TDSCarKitCore/Vendor/BigInt/Comparable.swift */; };
@@ -66,6 +67,7 @@
 		07F56AF5C64640432F486F25 /* App/MediaSockets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MediaSockets.swift; sourceTree = "<group>"; };
 		0A07DA9967C8458D728AC586 /* Sources/TDSCarKitCore/Vendor/BigInt/BigUInt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TDSCarKitCore/Vendor/BigInt/BigUInt.swift; sourceTree = "<group>"; };
 		0FC063C47C1B6FBDC0FB3C93 /* App/BLEBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/BLEBootstrap.swift; sourceTree = "<group>"; };
+		2537E300FE13185CA1E35981 /* App/BrowserBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/BrowserBridge.swift; sourceTree = "<group>"; };
 		16E2A38BC8A7D4D0FB884AB6 /* App/CarPlayMediaSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/CarPlayMediaSession.swift; sourceTree = "<group>"; };
 		1CE762103B75127055BD6BD1 /* Sources/TDSCarKitCore/Vendor/BigInt/Comparable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TDSCarKitCore/Vendor/BigInt/Comparable.swift; sourceTree = "<group>"; };
 		1DB089A9F84E14E95F11DCB5 /* Identity */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Identity; path = .local/Identity; sourceTree = "<group>"; };
@@ -132,6 +134,7 @@
 				88EE41E90E802F76407F8E4E /* App/AirPlayCredentials.swift */,
 				F17EB8379178EF804B1C9770 /* App/AppDelegate.swift */,
 				0FC063C47C1B6FBDC0FB3C93 /* App/BLEBootstrap.swift */,
+				2537E300FE13185CA1E35981 /* App/BrowserBridge.swift */,
 				BF3A69A086EFDEE36CFCEF7B /* App/CarPlayAudio.swift */,
 				A14BC9A1582FB7301EBA4EEC /* App/CarPlayControlBrowser.swift */,
 				53BD38A08293BBCCBC182639 /* App/CarPlayInfo.swift */,
@@ -257,6 +260,7 @@
 				82A602F72884956279B3793B /* App/AirPlayCredentials.swift in Sources */,
 				75A29E53D8539252B3301E6E /* App/AppDelegate.swift in Sources */,
 				9AA8500AA5EED0F288E24FE1 /* App/BLEBootstrap.swift in Sources */,
+				D11C6ABF50C922C2FE6BEAAE /* App/BrowserBridge.swift in Sources */,
 				F18EC0E491B6E27F5FB2FFCA /* App/CarPlayAudio.swift in Sources */,
 				4EC2B9A0957C0C7BA4C4D577 /* App/CarPlayControlBrowser.swift in Sources */,
 				E01EB6CB915B5F55F78F8DB6 /* App/CarPlayInfo.swift in Sources */,
@@ -326,12 +330,12 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/Sources/CTDSCarKitCrypto/include";
 				INFOPLIST_FILE = App/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.3;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_BUNDLE_IDENTIFIER = local.tds.carkit;
 				PRODUCT_NAME = TDSCarKit;
 				SDKROOT = iphoneos;
@@ -362,12 +366,12 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/Sources/CTDSCarKitCrypto/include";
 				INFOPLIST_FILE = App/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.3;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_BUNDLE_IDENTIFIER = local.tds.carkit;
 				PRODUCT_NAME = TDSCarKit;
 				SDKROOT = iphoneos;
