@@ -9,15 +9,16 @@ import CoreImage
 import CryptoKit
 
 func browserOutputCallback(
-    _ refCon: UnsafeMutableRawPointer?,
+    _ decompressionOutputRefCon: UnsafeMutableRawPointer?,
+    _ sourceFrameRefCon: UnsafeMutableRawPointer?,
     _ status: OSStatus,
     _ infoFlags: VTDecodeInfoFlags,
     _ imageBuffer: CVImageBuffer?,
     _ presentationTimeStamp: CMTime,
     _ duration: CMTime
 ) {
-    guard status == noErr, let refCon, let imageBuffer else { return }
-    let bridge = Unmanaged<BrowserBridge>.fromOpaque(refCon).takeUnretainedValue()
+    guard status == noErr, let decompressionOutputRefCon, let imageBuffer else { return }
+    let bridge = Unmanaged<BrowserBridge>.fromOpaque(decompressionOutputRefCon).takeUnretainedValue()
     bridge.handleDecodedFrame(imageBuffer)
 }
 
@@ -393,7 +394,7 @@ extension BrowserBridge {
         func beginReceiving() { receive() }
 
         func send(data: Data) {
-            connection.send(content: NWConnection.Content.data(data), completion: .contentProcessed { _ in })
+            connection.send(content: data, completion: .contentProcessed { _ in })
         }
 
         private func receive() {
@@ -457,7 +458,7 @@ extension BrowserBridge {
             var head = "HTTP/1.1 \(status)\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
             var response = Data(head.utf8)
             response.append(body)
-            connection.send(content: NWConnection.Content.data(response), completion: .contentProcessed { [weak self] _ in
+            connection.send(content: response, completion: .contentProcessed { [weak self] _ in
                 self?.connection.cancel()
             })
         }
