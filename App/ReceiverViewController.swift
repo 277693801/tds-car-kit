@@ -680,7 +680,10 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         ipField.text = ReceiverConfiguration.personalHotspotAddress() ?? ReceiverConfiguration.localIPv4Addresses().first
         modeChanged()
     }
-    @objc private func backgrounded() { if running { stop() }; receiverBrowser.stop() }
+    @objc private func backgrounded() {
+        // 配合 UIBackgroundModes(audio/voip) 保持 CarPlay 会话在后台继续运行，不再停止。
+        receiverBrowser.stop()
+    }
     @objc private func copyLog() { UIPasteboard.general.string = lines.joined(separator: "\n") }
     private func log(_ message: String) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
