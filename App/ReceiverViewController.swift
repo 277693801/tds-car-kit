@@ -562,9 +562,9 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             guard let identity else { return }
             let bridge = ReceiverConfiguration.personalHotspotAddress()
             if bridge == nil {
-                log("警告：未检测到个人热点桥接接口（本机 IPv4：\(ReceiverConfiguration.localIPv4Addresses().joined(separator: "、"))）。请确认热点开启且有设备连接。")
+                log("未检测到热点桥接接口，改用 127.0.0.1 回环地址请求 CarPlay 会话（实验性）。")
             }
-            var config = ReceiverConfiguration(name: nameField.text ?? "CarPlay 车机", address: bridge ?? ReceiverConfiguration.localIPv4Addresses().first ?? "127.0.0.1",
+            var config = ReceiverConfiguration(name: nameField.text ?? "CarPlay 车机", address: bridge ?? "127.0.0.1",
                 ssid: ssidField.text ?? "", password: password, wifiChannel: channel, autoChannel: autoChannel,
                 audioEnabled: audioSwitch.isOn, deviceID: ReceiverConfiguration.persistentDeviceID())
             configureDisplay(&config)
@@ -638,7 +638,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         connectionHelp.text = remote
             ? "使用同一 Wi-Fi，或让 iPad 连接本 iPhone 的个人热点。"
             : local ? (ReceiverConfiguration.personalHotspotAddress() == nil
-                ? "本机模式需要个人热点桥接：请开启热点，并让一台设备连上热点（热点页显示 1 个连接）后再开始。"
+                ? "未检测到热点桥接，将用回环地址尝试；更稳定可开启热点并让设备连上。"
                 : "在本 iPhone 启动 CarPlay，连接期间保持 App 前台。")
             : "先在这里启动显示器，再到 iPhone 上打开本应用进行连接。"
         driveRow.isHidden = remote

@@ -76,7 +76,7 @@ struct ReceiverConfiguration {
         guard inet_pton(AF_INET, address, &parsed) == 1 else {
             throw ConfigurationError("请选择具有有效 IPv4 地址的接收器。")
         }
-        if requiresLocalAddress && !Self.localIPv4Addresses().contains(address) {
+        if requiresLocalAddress, address != "127.0.0.1", !Self.localIPv4Addresses().contains(address) {
             throw ConfigurationError("请选择属于本机网络连接的 IP 地址。")
         }
         guard requiresWiFiCredentials else { return }
