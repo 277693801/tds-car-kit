@@ -70,15 +70,15 @@ struct ReceiverConfiguration {
     func validate(requiresLocalAddress: Bool = true, requiresWiFiCredentials: Bool = true) throws {
         var parsed = in_addr()
         guard inet_pton(AF_INET, address, &parsed) == 1 else {
-            throw ConfigurationError("Choose a receiver with a valid IPv4 address.")
+            throw ConfigurationError("请选择具有有效 IPv4 地址的接收器。")
         }
         if requiresLocalAddress && !Self.localIPv4Addresses().contains(address) {
-            throw ConfigurationError("Choose an IP address belonging to this device’s network connection.")
+            throw ConfigurationError("请选择属于本机网络连接的 IP 地址。")
         }
         guard requiresWiFiCredentials else { return }
-        guard !ssid.isEmpty, ssid.utf8.count <= 32 else { throw ConfigurationError(ssid.isEmpty ? "Enter the Wi-Fi network name before starting." : "Wi-Fi network names cannot exceed 32 UTF-8 bytes.") }
+        guard !ssid.isEmpty, ssid.utf8.count <= 32 else { throw ConfigurationError(ssid.isEmpty ? "启动前请输入 Wi-Fi 网络名称。" : "Wi-Fi 网络名称不能超过 32 个 UTF-8 字节。") }
         guard password.isEmpty || (8...63).contains(password.utf8.count) else {
-            throw ConfigurationError("Enter an 8–63-byte Wi-Fi password, or leave it empty for an open network.")
+            throw ConfigurationError("请输入 8–63 字节的 Wi-Fi 密码；开放网络可留空。")
         }
     }
 }

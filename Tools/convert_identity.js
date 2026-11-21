@@ -94,8 +94,8 @@ const x = b64urlToBytes(pubJwk.x);
 const y = b64urlToBytes(pubJwk.y);
 if (d.length !== 32 || x.length !== 32 || y.length !== 32) fail('unexpected key component sizes');
 
-// X9.63 private key = d || 0x04 || X || Y
-const x963 = Buffer.concat([d, Buffer.from([0x04]), x, y]);
+// X9.63 private key = 0x04 || X || Y || d (public point, then private scalar)
+const x963 = Buffer.concat([Buffer.from([0x04]), x, y, d]);
 if (x963.length !== 97) fail('internal error: x963 length ' + x963.length);
 
 // Find the leaf certificate in the PKCS#7 whose SPKI matches the derived public key.

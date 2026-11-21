@@ -1,17 +1,40 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Browser bridge: forwards the received H.264 Annex-B access units to a LAN
-// browser unchanged, where WebCodecs decodes them. Each binary frame is
-// prefixed with one keyframe flag byte (1 = key, 0 = delta).
 import Foundation
 import Network
 import UIKit
+import VideoToolbox
+import CoreVideo
+import CoreMedia
+import CoreImage
 import CryptoKit
+
+func browserOutputCallback(
+    _ decompressionOutputRefCon: UnsafeMutableRawPointer?,
+    _ sourceFrameRefCon: UnsafeMutableRawPointer?,
+    _ status: OSStatus,
+    _ infoFlags: VTDecodeInfoFlags,
+    _ imageBuffer: CVImageBuffer?,
+    _ presentationTimeStamp: CMTime,
+    _ duration: CMTime
+) {
+    guard status == noErr, let decompressionOutputRefCon, let imageBuffer else { return }
+    let bridge = Unmanaged<BrowserBridge>.fromOpaque(decompressionOutputRefCon).takeUnretainedValue()
+    bridge.handleDecodedFrame(imageBuffer)
+}
 
 final class BrowserBridge {
 
     private let queue = DispatchQueue(label: "TDSCarKit.browser")
     private var listener: NWListener?
     private var clients: [Client] = []
+
+    private var session: VTDecompressionSession?
+    private var format: CMVideoFormatDescription?
+    private var sps: Data?
+    private var pps: Data?
+    private var ciContext: CIContext?
+    private var lastEmit = Date.distantPast
+    private var videoSize = CGSize(width: 1280, height: 720)
 
     var onTouch: ((UInt16, UInt16, Bool) -> Void)?
     var onLog: ((String) -> Void)?
@@ -21,43 +44,157 @@ final class BrowserBridge {
     }
 
     func push(accessUnit: Data) {
-        queue.async { [weak self] in self?.forward(accessUnit) }
+        queue.async { [weak self] in self?.decode(accessUnit) }
     }
 
     func reset() {
-        // Decoding happens in the browser now; nothing to tear down on device.
+        queue.async { [weak self] in self?.teardownDecoder() }
     }
 
     func stop() {
         queue.async { [weak self] in
+            self?.teardownDecoder()
             self?.listener?.cancel()
             self?.listener = nil
             self?.clients.removeAll()
         }
     }
 
-    // MARK: - Forwarding
-
-    private func forward(_ accessUnit: Data) {
-        guard !accessUnit.isEmpty else { return }
-        var packet = Data([Self.isKeyframe(accessUnit) ? 1 : 0])
-        packet.append(accessUnit)
-        broadcast(packet)
-    }
-
-    private static func isKeyframe(_ accessUnit: Data) -> Bool {
-        guard let nals = try? AnnexB.units(in: accessUnit) else { return false }
-        return nals.contains { nal in
-            guard let first = nal.first else { return false }
-            return (first & 0x1f) == 5
+    deinit {
+        if let session {
+            VTDecompressionSessionInvalidate(session)
         }
     }
 
-    private func broadcast(_ data: Data) {
-        let packet = Client.encodeFrame(opcode: 0x2, payload: data)
-        for client in clients where client.phase == .websocket {
-            client.send(data: packet)
+    // MARK: - Decode
+
+    private func decode(_ accessUnit: Data) {
+        guard let nals = try? AnnexB.units(in: accessUnit) else { return }
+        var pictures: [Data] = []
+        var changed = false
+
+        for nal in nals {
+            guard let first = nal.first else { continue }
+            switch first & 0x1f {
+            case 7:
+                if sps != nal { sps = nal; changed = true }
+            case 8:
+                if pps != nal { pps = nal; changed = true }
+            default:
+                pictures.append(nal)
+            }
         }
+
+        if (changed || format == nil), let sps, let pps {
+            setupDecoder(sps: sps, pps: pps)
+        }
+
+        guard !pictures.isEmpty, let format, let session else { return }
+        guard let avcc = try? AnnexB.lengthPrefixed(pictures) else { return }
+
+        var block: CMBlockBuffer?
+        var status = CMBlockBufferCreateWithMemoryBlock(
+            allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: avcc.count,
+            blockAllocator: kCFAllocatorDefault, customBlockSource: nil, offsetToData: 0,
+            dataLength: avcc.count, flags: 0, blockBufferOut: &block)
+        guard status == noErr, let block else { return }
+
+        status = avcc.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress else { return kCMBlockBufferNoErr }
+            return CMBlockBufferReplaceDataBytes(with: base, blockBuffer: block,
+                offsetIntoDestination: 0, dataLength: avcc.count)
+        }
+        guard status == noErr else { return }
+
+        var sample: CMSampleBuffer?
+        var sampleSize = avcc.count
+        var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+        status = CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: block,
+            formatDescription: format, sampleCount: 1, sampleTimingEntryCount: 1,
+            sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &sampleSize,
+            sampleBufferOut: &sample)
+        guard status == noErr, let sample else { return }
+
+        VTDecompressionSessionDecodeFrame(session, sampleBuffer: sample, flags: [], frameRefcon: nil, infoFlagsOut: nil)
+    }
+
+    private func setupDecoder(sps: Data, pps: Data) {
+        teardownDecoder()
+
+        var newFormat: CMVideoFormatDescription?
+        let status = sps.withUnsafeBytes { sRaw in
+            pps.withUnsafeBytes { pRaw in
+                guard let s = sRaw.bindMemory(to: UInt8.self).baseAddress,
+                      let p = pRaw.bindMemory(to: UInt8.self).baseAddress else { return OSStatus(-1) }
+                let pointers: [UnsafePointer<UInt8>] = [s, p]
+                let sizes: [Int] = [sps.count, pps.count]
+                return CMVideoFormatDescriptionCreateFromH264ParameterSets(
+                    allocator: kCFAllocatorDefault, parameterSetCount: 2,
+                    parameterSetPointers: pointers, parameterSetSizes: sizes,
+                    nalUnitHeaderLength: 4, formatDescriptionOut: &newFormat)
+            }
+        }
+        guard status == noErr, let newFormat else {
+            onLog?("Browser bridge: H.264 parameters rejected (\(status))")
+            return
+        }
+
+        let dims = CMVideoFormatDescriptionGetDimensions(newFormat)
+        videoSize = CGSize(width: Int(dims.width), height: Int(dims.height))
+
+        let attributes: [CFString: Any] = [
+            kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+            kCVPixelBufferWidthKey: Int(dims.width),
+            kCVPixelBufferHeightKey: Int(dims.height),
+        ]
+
+        let outputCallback: VTDecompressionOutputCallback = browserOutputCallback
+        var callback = VTDecompressionOutputCallbackRecord(
+            decompressionOutputCallback: outputCallback,
+            decompressionOutputRefCon: Unmanaged.passUnretained(self).toOpaque())
+        var newSession: VTDecompressionSession?
+        let createStatus = VTDecompressionSessionCreate(
+            allocator: kCFAllocatorDefault, formatDescription: newFormat,
+            decoderSpecification: nil, imageBufferAttributes: attributes as CFDictionary,
+            outputCallback: &callback, decompressionSessionOut: &newSession)
+
+        guard createStatus == noErr, let newSession else {
+            onLog?("Browser bridge: decoder session failed (\(createStatus))")
+            return
+        }
+
+        format = newFormat
+        session = newSession
+        ciContext = nil
+        onLog?("Browser bridge: video decoder ready \(Int(dims.width))×\(Int(dims.height))")
+    }
+
+    fileprivate func handleDecodedFrame(_ imageBuffer: CVImageBuffer) {
+        let now = Date()
+        guard now.timeIntervalSince(lastEmit) >= 1.0 / 15.0 else { return }
+        lastEmit = now
+
+        if ciContext == nil {
+            ciContext = CIContext(options: [.cacheIntermediates: false])
+        }
+        guard let ciContext else { return }
+
+        let image = CIImage(cvPixelBuffer: imageBuffer)
+        guard let cgImage = ciContext.createCGImage(image, from: image.extent) else { return }
+        let jpeg = UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.6)
+        broadcast(jpeg)
+    }
+
+    private func teardownDecoder() {
+        if let session {
+            VTDecompressionSessionInvalidate(session)
+        }
+        session = nil
+        format = nil
+        sps = nil
+        pps = nil
+        ciContext = nil
     }
 
     // MARK: - Server
@@ -113,6 +250,25 @@ final class BrowserBridge {
         clients.removeAll { $0 === client }
     }
 
+    private func broadcast(_ jpeg: Data?) {
+        guard let jpeg, !jpeg.isEmpty else { return }
+        let packet = Client.encodeFrame(opcode: 0x2, payload: jpeg)
+        for client in clients where client.phase == .websocket {
+            client.send(data: packet)
+        }
+    }
+
+    private func announceSize() {
+        let payload = try? JSONSerialization.data(withJSONObject: [
+            "type": "size", "w": Int(videoSize.width), "h": Int(videoSize.height)
+        ])
+        guard let payload else { return }
+        let packet = Client.encodeFrame(opcode: 0x1, payload: payload)
+        for client in clients where client.phase == .websocket {
+            client.send(data: packet)
+        }
+    }
+
     static let webPage = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -133,16 +289,14 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 <canvas id="cv"></canvas>
 <script>
 (function(){
-  var VW=1280,VH=720;
   var canvas=document.getElementById('cv');
   var ctx=canvas.getContext('2d');
   var pill=document.getElementById('pill');
+  var img=new Image();
+  var hasFrame=false;
+  var VW=1280,VH=720;
   var ws=null;
   var active=false;
-  var decoder=null;
-  var currentFrame=null;
-  var pending=[];
-  var ts=0;
   var proto=location.protocol==='https:'?'wss:':'ws:';
   var wsUrl=proto+'//'+location.host+'/ws';
 
@@ -156,9 +310,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
     var ox=(cw-dw)/2,oy=(ch-dh)/2;
     ctx.fillStyle='#000';
     ctx.fillRect(0,0,cw,ch);
-    if(currentFrame){
-      try{ctx.drawImage(currentFrame,ox,oy,dw,dh);}catch(e){}
-    }
+    ctx.drawImage(img,ox,oy,dw,dh);
   }
 
   function resize(){
@@ -167,65 +319,27 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
     canvas.height=Math.floor(window.innerHeight*dpr);
     canvas.style.width=window.innerWidth+'px';
     canvas.style.height=window.innerHeight+'px';
-    draw();
-  }
-
-  function onFrame(frame){
-    if(currentFrame){try{currentFrame.close();}catch(e){}}
-    currentFrame=frame;
-    draw();
-  }
-
-  function ensureDecoder(){
-    if(decoder)return;
-    if(typeof VideoDecoder==='undefined'){
-      setPill('浏览器不支持 WebCodecs(H.264)',false);
-      return;
-    }
-    try{
-      decoder=new VideoDecoder({
-        output:onFrame,
-        error:function(e){setPill('解码错误：'+e.message,false);}
-      });
-      decoder.configure({codec:'avc'});
-      setPill('已连接，可触摸操作',true);
-    }catch(e){
-      setPill('WebCodecs 初始化失败：'+e.message,false);
-    }
-  }
-
-  function flush(){
-    if(!decoder||decoder.state!=='configured')return;
-    while(pending.length){
-      var c=pending.shift();
-      try{decoder.decode(c);}catch(e){}
-    }
-  }
-
-  function feed(data,key){
-    ensureDecoder();
-    pending.push(new EncodedVideoChunk({type:key?'key':'delta',timestamp:ts++,data:data}));
-    flush();
+    if(hasFrame){draw();}
   }
 
   function open(){
     ws=new WebSocket(wsUrl);
     ws.binaryType='arraybuffer';
     ws.onopen=function(){setPill('已连接，可触摸操作',true);};
-    ws.onclose=function(){
-      setPill('连接断开，正在重连…',false);
-      if(decoder){try{decoder.close();}catch(e){}}
-      decoder=null;currentFrame=null;pending=[];
-      setTimeout(open,1500);
-    };
+    ws.onclose=function(){setPill('连接断开，正在重连…',false);setTimeout(open,1500);};
     ws.onerror=function(){};
     ws.onmessage=function(ev){
-      if(typeof ev.data==='string'){return;}
-      var arr=new Uint8Array(ev.data);
-      if(arr.length<2){return;}
-      var key=arr[0]===1;
-      var data=arr.slice(1);
-      feed(data,key);
+      if(typeof ev.data==='string'){
+        try{
+          var msg=JSON.parse(ev.data);
+          if(msg.type==='size'){VW=msg.w;VH=msg.h;if(hasFrame){draw();}}
+        }catch(e){}
+        return;
+      }
+      var blob=new Blob([ev.data],{type:'image/jpeg'});
+      var url=URL.createObjectURL(blob);
+      img.onload=function(){hasFrame=true;draw();URL.revokeObjectURL(url);};
+      img.src=url;
     };
   }
 
@@ -335,19 +449,20 @@ extension BrowserBridge {
                 respondAndClose(status: "400 Bad Request", body: Data("Bad Request".utf8))
                 return
             }
-            var headers: [String: String] = [:]
-            for line in text.components(separatedBy: "\r\n").dropFirst() {
-                let kv = line.split(separator: ":", maxSplits: 1)
-                guard kv.count == 2 else { continue }
-                headers[String(kv[0]).trimmingCharacters(in: .whitespaces).lowercased()] =
-                    String(kv[1]).trimmingCharacters(in: .whitespaces)
-            }
+            let headers: [String: String] = Dictionary(uniqueKeysWithValues: text
+                .components(separatedBy: "\r\n").dropFirst().compactMap { line -> (String, String)? in
+                    let kv = line.split(separator: ":", maxSplits: 1)
+                    guard kv.count == 2 else { return nil }
+                    return (String(kv[0]).trimmingCharacters(in: .whitespaces).lowercased(),
+                            String(kv[1]).trimmingCharacters(in: .whitespaces))
+                })
             let key = headers["sec-websocket-key"] ?? ""
             if headers["upgrade"]?.lowercased() == "websocket", !key.isEmpty {
                 phase = .websocket
                 let accept = Self.acceptKey(key)
                 var response = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: \(accept)\r\n\r\n"
                 send(data: Data(response.utf8))
+                server?.announceSize()
             } else {
                 respondAndClose(status: "200 OK", body: Data(BrowserBridge.webPage.utf8))
             }

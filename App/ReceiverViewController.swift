@@ -11,7 +11,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
     private let receiverBrowser = TDSCarKitReceiverBrowser()
     private let receiverPicker = UIButton(type: .system)
     private var remoteTarget: TDSCarKitReceiverBrowser.Target?
-    private let modeControl = UISegmentedControl(items: ["Receive", "This iPhone", "Send to iPad"])
+    private let modeControl = UISegmentedControl(items: ["接收", "本机", "发送到 iPad"])
     private var networkFields: [UIView] = []
     private let nameField = UITextField()
     private let ipField = UITextField()
@@ -20,7 +20,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
     private let channelField = UITextField()
     private let openNetworkSwitch = UISwitch()
     private let audioSwitch = UISwitch()
-    private let driveControl = UISegmentedControl(items: ["Left-hand drive", "Right-hand drive"])
+    private let driveControl = UISegmentedControl(items: ["左舵", "右舵"])
     private var driveRow: UIView!
     private let networkButton = UIButton(type: .system)
     private let networkSummary = UILabel()
@@ -33,7 +33,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
     private var settingsVisible = false
     private let diagnosticsButton = UIButton(type: .system)
     private var diagnosticsStack: UIStackView!
-    private let orientationControl = UISegmentedControl(items: ["Landscape", "Portrait"])
+    private let orientationControl = UISegmentedControl(items: ["横屏", "竖屏"])
     private var orientationRow: UIView!
     private let bluetoothSetupSwitch = UISwitch()
     private var bluetoothSetupRow: UIView!
@@ -73,10 +73,10 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "TDS Car Kit"
+        title = "CarPlay 车机"
         view.backgroundColor = .systemGroupedBackground
         navigationItem.rightBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "gearshape"), style: .plain, target: self, action: #selector(toggleSettings))
-        navigationItem.rightBarButtonItem?.accessibilityLabel = "Settings"
+        navigationItem.rightBarButtonItem?.accessibilityLabel = "设置"
         locationManager.delegate = self
         heading.font = .preferredFont(forTextStyle: .largeTitle)
         heading.numberOfLines = 0
@@ -84,24 +84,24 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         explanation.font = .preferredFont(forTextStyle: .body); explanation.textColor = .secondaryLabel; explanation.numberOfLines = 0
         [heading, explanation, statusLabel, connectionHelp, networkSummary].forEach { $0.adjustsFontForContentSizeCategory = true; $0.lineBreakMode = .byWordWrapping }
         statusLabel.font = .preferredFont(forTextStyle: .headline); statusLabel.numberOfLines = 0
-        nameField.text = UserDefaults.standard.string(forKey: "receiverName") ?? "TDS Car Kit"
+        nameField.text = UserDefaults.standard.string(forKey: "receiverName") ?? "CarPlay 车机"
         ipField.text = ReceiverConfiguration.localIPv4Addresses().first
         ssidField.text = UserDefaults.standard.string(forKey: "wifiSSID")
         ssidField.addTarget(self, action: #selector(networkNameChanged), for: .editingChanged)
         ssidField.addTarget(self, action: #selector(loadWiFiPassword), for: .editingDidEnd)
         channelField.text = String(UserDefaults.standard.object(forKey: "wifiChannel") as? Int ?? 36)
         channelField.keyboardType = .numberPad
-        networkFields = [field(nameField, title: "Receiver name"), field(ipField, title: "This device’s Wi-Fi IP address"),
-            field(ssidField, title: "Connected Wi-Fi network name"), field(passwordField, title: "Wi-Fi password"),
-            field(channelField, title: "Wi-Fi channel")]
-        let openLabel = UILabel(); openLabel.text = "Open network (no password)"; openLabel.font = .preferredFont(forTextStyle: .footnote)
+        networkFields = [field(nameField, title: "接收器名称"), field(ipField, title: "本机 Wi-Fi IP 地址"),
+            field(ssidField, title: "当前连接的 Wi-Fi 名称"), field(passwordField, title: "Wi-Fi 密码"),
+            field(channelField, title: "Wi-Fi 信道")]
+        let openLabel = UILabel(); openLabel.text = "开放网络（无密码）"; openLabel.font = .preferredFont(forTextStyle: .footnote)
         let openRow = UIStackView(arrangedSubviews: [openLabel, openNetworkSwitch]); openRow.spacing = 12
         networkFields.append(openRow)
         audioSwitch.isOn = UserDefaults.standard.object(forKey: "speakerAudio") as? Bool ?? true
-        let audioLabel = UILabel(); audioLabel.text = "Play audio on this device"; audioLabel.font = .preferredFont(forTextStyle: .footnote)
+        let audioLabel = UILabel(); audioLabel.text = "在本机播放音频"; audioLabel.font = .preferredFont(forTextStyle: .footnote)
         let audioRow = UIStackView(arrangedSubviews: [audioLabel, audioSwitch]); audioRow.spacing = 12
         networkFields.append(audioRow)
-        let bluetoothLabel = UILabel(); bluetoothLabel.text = "Bluetooth setup (experimental)"; bluetoothLabel.font = .preferredFont(forTextStyle: .footnote)
+        let bluetoothLabel = UILabel(); bluetoothLabel.text = "蓝牙连接（实验性）"; bluetoothLabel.font = .preferredFont(forTextStyle: .footnote)
         bluetoothSetupSwitch.addTarget(self, action: #selector(modeChanged), for: .valueChanged)
         bluetoothSetupRow = UIStackView(arrangedSubviews: [bluetoothLabel, bluetoothSetupSwitch])
         (bluetoothSetupRow as? UIStackView)?.spacing = 12
@@ -132,22 +132,22 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         settingsStack.isHidden = true
         driveControl.selectedSegmentIndex = (UserDefaults.standard.object(forKey: "rightHandDrive") as? Bool ?? true) ? 1 : 0
         driveControl.addTarget(self, action: #selector(driveChanged), for: .valueChanged)
-        let driveLabel = UILabel(); driveLabel.text = "Driver’s seat"
+        let driveLabel = UILabel(); driveLabel.text = "驾驶位"
         let driveStack = UIStackView(arrangedSubviews: [driveLabel, driveControl]); driveStack.axis = .vertical; driveStack.spacing = 8
         driveRow = driveStack; settingsStack.insertArrangedSubview(driveStack, at: 1)
-        networkButton.setTitle("Detect current Wi-Fi", for: .normal)
+        networkButton.setTitle("检测当前 Wi-Fi", for: .normal)
         networkButton.addTarget(self, action: #selector(detectNetwork), for: .touchUpInside)
         settingsStack.insertArrangedSubview(networkButton, at: 2)
         networkSummary.font = .preferredFont(forTextStyle: .footnote); networkSummary.textColor = .secondaryLabel; networkSummary.numberOfLines = 0
         stack.addArrangedSubview(networkSummary)
         hotspotNote.font = .preferredFont(forTextStyle: .footnote); hotspotNote.textColor = .secondaryLabel; hotspotNote.numberOfLines = 0
-        hotspotNote.text = "For iPhone hotspot: enable Personal Hotspot in Settings and connect the iPad to it. Keep a Wi-Fi profile saved here for the CarPlay handshake. Hotspot passwords are managed by iOS."
+        hotspotNote.text = "iPhone 热点：请在设置中开启个人热点并让 iPad 连接它；同时为 CarPlay 握手保留一份 Wi-Fi 配置。热点密码由 iOS 管理。"
         settingsStack.addArrangedSubview(hotspotNote)
         contentStack = stack
         orientationControl.selectedSegmentIndex = UserDefaults.standard.bool(forKey: "portraitDisplay") ? 1 : 0
         orientationControl.addTarget(self, action: #selector(orientationChanged), for: .valueChanged)
-        let orientationLabel = UILabel(); orientationLabel.text = "CarPlay orientation"
-        let orientationNote = UILabel(); orientationNote.text = "Choose before connecting. Stop and reconnect to change the CarPlay layout."; orientationNote.numberOfLines = 0
+        let orientationLabel = UILabel(); orientationLabel.text = "CarPlay 方向"
+        let orientationNote = UILabel(); orientationNote.text = "连接前选择；更改布局需停止后重连。"; orientationNote.numberOfLines = 0
         orientationNote.font = .preferredFont(forTextStyle: .footnote); orientationNote.textColor = .secondaryLabel
         let orientationStack = UIStackView(arrangedSubviews: [orientationLabel, orientationControl, orientationNote])
         orientationStack.axis = .vertical; orientationStack.spacing = 8
@@ -155,15 +155,15 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         passwordField.isSecureTextEntry = true
         ipField.keyboardType = .decimalPad
         let note = UILabel(); note.numberOfLines = 0; note.font = .preferredFont(forTextStyle: .footnote); note.textColor = .secondaryLabel
-        note.text = "The Wi-Fi password is saved securely in this device’s Keychain when you start. It is never included in logs."
+        note.text = "Wi-Fi 密码会在启动时安全存入本机钥匙串，不会写入日志。"
         settingsStack.addArrangedSubview(note)
         networkFields.append(note)
         passwordStatus.font = .preferredFont(forTextStyle: .footnote); passwordStatus.numberOfLines = 0
         passwordStatus.textColor = .secondaryLabel
-        forgetPasswordButton.setTitle("Forget saved Wi-Fi password", for: .normal)
+        forgetPasswordButton.setTitle("忘记已保存的 Wi-Fi 密码", for: .normal)
         forgetPasswordButton.addTarget(self, action: #selector(forgetWiFiPassword), for: .touchUpInside)
         settingsStack.addArrangedSubview(passwordStatus); settingsStack.addArrangedSubview(forgetPasswordButton)
-        startButton.setTitle("Start receiver", for: .normal)
+        startButton.setTitle("启动接收器", for: .normal)
         startButton.setTitleColor(.white, for: .normal)
         startButton.backgroundColor = view.tintColor
         startButton.layer.cornerRadius = 12
@@ -176,15 +176,15 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         videoHeight.priority = .defaultLow
         videoHeight.isActive = true
         stack.addArrangedSubview(videoSurface)
-        fullscreenButton.setTitle("Show CarPlay full screen", for: .normal)
+        fullscreenButton.setTitle("全屏显示 CarPlay", for: .normal)
         fullscreenButton.addTarget(self, action: #selector(showFullscreen), for: .touchUpInside)
         fullscreenButton.isHidden = true; stack.addArrangedSubview(fullscreenButton)
         logView.isEditable = false; logView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         logView.backgroundColor = .secondarySystemBackground; logView.layer.cornerRadius = 12
         logView.heightAnchor.constraint(equalToConstant: 220).isActive = true
-        diagnosticsButton.setTitle("Show diagnostics", for: .normal)
+        diagnosticsButton.setTitle("显示诊断日志", for: .normal)
         diagnosticsButton.addTarget(self, action: #selector(toggleDiagnostics), for: .touchUpInside)
-        let copyButton = UIButton(type: .system); copyButton.setTitle("Copy log", for: .normal)
+        let copyButton = UIButton(type: .system); copyButton.setTitle("复制日志", for: .normal)
         copyButton.addTarget(self, action: #selector(copyLog), for: .touchUpInside)
         diagnosticsStack = UIStackView(arrangedSubviews: [logView, copyButton]); diagnosticsStack.axis = .vertical; diagnosticsStack.spacing = 8
         diagnosticsStack.isHidden = true
@@ -212,12 +212,12 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
                 self.browserBridge.push(accessUnit: data)
                 self.videoSurface.isHidden = false
                 if !self.displayedVideo {
-                    self.displayedVideo = true; self.statusLabel.text = "Receiving CarPlay video"
+                    self.displayedVideo = true; self.statusLabel.text = "正在接收 CarPlay 视频"
                     self.fullscreenButton.isHidden = false
-                    self.log("Video data delivered to the native display layer")
+                    self.log("视频已送达本地显示层")
                     if UIDevice.current.userInterfaceIdiom == .pad { self.showFullscreen() }
                 }
-            } catch { self.log("Video display error: \(error)") }
+            } catch { self.log("视频显示错误：\(error)") }
         }
         videoSurface.onLog = { [weak self] in self?.log($0) }
         videoSurface.onTouch = { [weak self] point, down in
@@ -228,7 +228,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             self?.receiver.touch(x: x, y: y, down: down)
         }
         browserBridge.start(port: 8081)
-        log("Browser display: open http://\(ReceiverConfiguration.localIPv4Addresses().first ?? "<IP>"):8081 in a browser on the same network")
+        log("浏览器显示：在同一局域网浏览器打开 http://\(ReceiverConfiguration.localIPv4Addresses().first ?? "<IP>"):8081")
         receiver.onFailure = { [weak self] in self?.stop() }
         bluetooth.onFailure = { [weak self] message in
             self?.stop()
@@ -236,7 +236,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         }
         bluetooth.onAdvertising = { [weak self] in
             guard let self, self.running else { return }
-            self.statusLabel.text = "Bluetooth advertising · waiting for iPhone"
+            self.statusLabel.text = "蓝牙广播中 · 等待 iPhone"
         }
         controlBrowser.onLog = { [weak self] in self?.log($0) }
         receiverBrowser.onLog = { [weak self] in self?.log($0) }
@@ -245,7 +245,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             if let selected = self.remoteTarget, !targets.contains(selected) { self.remoteTarget = nil }
             self.receiverPicker.isEnabled = !targets.isEmpty
             self.receiverPicker.setTitle(self.remoteTarget.map { "\($0.name) · \($0.address)" }
-                ?? (targets.isEmpty ? "Searching for iPad receivers…" : "Choose iPad receiver"), for: .normal)
+                ?? (targets.isEmpty ? "正在搜索 iPad 接收器…" : "选择 iPad 接收器"), for: .normal)
             self.receiverPicker.menu = UIMenu(children: targets.map { target in
                 UIAction(title: target.name) { [weak self] _ in
                     self?.remoteTarget = target
@@ -257,8 +257,8 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             guard let self else { return }
             if self.modeControl.selectedSegmentIndex == 2 {
                 self.statusLabel.text = message.contains("requested")
-                    ? "Connection requested · keep this app open" : "Connecting to your iPad…"
-            } else { self.statusLabel.text = "Connecting CarPlay…" }
+                    ? "已请求连接 · 请保持 App 在前台" : "正在连接 iPad…"
+            } else { self.statusLabel.text = "正在连接 CarPlay…" }
         }
         sameDevice.onLog = { [weak self] in self?.log($0) }
         sameDevice.onFinished = { [weak self] message in
@@ -269,11 +269,11 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         loadWiFiPassword()
         modeChanged()
         #if targetEnvironment(macCatalyst)
-        log("Running the native UIKit target on Mac Catalyst; no external receiver process")
+        log("在 Mac Catalyst 上运行原生 UIKit target；无外部接收进程")
         #elseif targetEnvironment(simulator)
-        log("Simulator: Bluetooth hardware connections are not validated here")
+        log("模拟器：此处不校验蓝牙硬件连接")
         #else
-        log("Running native iPad/iPhone target")
+        log("正在原生 iPad/iPhone 上运行")
         #endif
         NotificationCenter.default.addObserver(self, selector: #selector(foregrounded), name: UIApplication.willEnterForegroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(backgrounded), name: UIApplication.didEnterBackgroundNotification, object: nil)
@@ -300,13 +300,13 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
     @objc private func toggleSettings() {
         settingsVisible.toggle(); settingsStack.isHidden = !settingsVisible
         navigationItem.rightBarButtonItem?.image = UIImage(systemName: settingsVisible ? "xmark" : "gearshape")
-        navigationItem.rightBarButtonItem?.accessibilityLabel = settingsVisible ? "Close settings" : "Settings"
+        navigationItem.rightBarButtonItem?.accessibilityLabel = settingsVisible ? "关闭设置" : "设置"
         if !settingsVisible { view.endEditing(true) }
     }
     private func revealSettings() { if !settingsVisible { toggleSettings() } }
     @objc private func toggleDiagnostics() {
         diagnosticsStack.isHidden.toggle()
-        diagnosticsButton.setTitle(diagnosticsStack.isHidden ? "Show diagnostics" : "Hide diagnostics", for: .normal)
+        diagnosticsButton.setTitle(diagnosticsStack.isHidden ? "显示诊断日志" : "隐藏诊断日志", for: .normal)
         if !diagnosticsStack.isHidden { logView.text = lines.joined(separator: "\n") }
     }
     @objc private func driveChanged() {
@@ -336,7 +336,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         settings.tintColor = .white
         settings.backgroundColor = UIColor(white: 0.2, alpha: 0.8)
         settings.layer.cornerRadius = 8
-        settings.accessibilityLabel = "TDS Car Kit settings"
+        settings.accessibilityLabel = "CarPlay 车机设置"
         settings.addTarget(self, action: #selector(showConnectionSettings), for: .touchUpInside)
         settings.translatesAutoresizingMaskIntoConstraints = false; container.addSubview(settings)
         fullscreenConstraints = [container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -353,7 +353,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             if #available(iOS 16.0, *) {
                 setNeedsUpdateOfSupportedInterfaceOrientations()
                 view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations)) { [weak self] _ in
-                    self?.log("Rotate the iPad to the selected orientation for the full-screen display")
+                    self?.log("旋转 iPad 到所选方向以全屏显示")
                 }
             }
         }
@@ -379,17 +379,17 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         do {
             if let saved = try WiFiCredentials.password(for: ssidField.text ?? "") {
                 passwordField.text = saved; openNetworkSwitch.isOn = saved.isEmpty
-                passwordStatus.text = "Saved Wi-Fi details loaded from Keychain"
+                passwordStatus.text = "已从钥匙串加载已保存的 Wi-Fi 信息"
             }
-        } catch { passwordStatus.text = "Could not read saved Wi-Fi password. Enter it below." }
+        } catch { passwordStatus.text = "无法读取已保存的 Wi-Fi 密码，请在下方输入。" }
     }
     private func refreshNetworkSummary() {
         if UIDevice.current.userInterfaceIdiom == .phone, ReceiverConfiguration.personalHotspotAddress() != nil {
             let saved = !(ssidField.text ?? "").isEmpty && (!(passwordField.text ?? "").isEmpty || openNetworkSwitch.isOn)
-            networkSummary.text = saved ? "Personal Hotspot detected · saved CarPlay profile ready" : "Personal Hotspot detected · save a Wi-Fi profile in Settings first"
+            networkSummary.text = saved ? "检测到个人热点 · CarPlay 配置已就绪" : "检测到个人热点 · 请先在设置中保存 Wi-Fi 配置"
         } else if needsNetworkDetails, let ssid = ssidField.text, !ssid.isEmpty {
-            networkSummary.text = "CarPlay network: \(ssid)"
-        } else { networkSummary.text = "Your iPhone will find this display as “\(nameField.text ?? "TDS Car Kit")”." }
+            networkSummary.text = "CarPlay 网络：\(ssid)"
+        } else { networkSummary.text = "你的 iPhone 将以“\(nameField.text ?? "CarPlay 车机")”找到此显示器。" }
     }
     @objc private func detectNetwork() { refreshCurrentNetwork(requestPermission: true) }
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -407,7 +407,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             awaitingNetworkPermission = true; locationManager.requestWhenInUseAuthorization(); return
         }
         guard authorization == .authorizedWhenInUse || authorization == .authorizedAlways else {
-            if requestPermission { networkSummary.text = "Allow Location access in Settings to detect Wi-Fi, or enter the network manually." }
+            if requestPermission { networkSummary.text = "请在设置中允许定位以检测 Wi-Fi，或手动输入网络。" }
             return
         }
         fetchingNetwork = true
@@ -417,7 +417,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
                 guard let self else { return }; self.fetchingNetwork = false
                 guard !self.running, self.ssidField.text == previousSSID else { return }
                 guard let network else {
-                    if requestPermission { self.networkSummary.text = "Wi-Fi name unavailable. Keep the saved profile or enter it manually." }
+                    if requestPermission { self.networkSummary.text = "无法获取 Wi-Fi 名称。请保留已保存的配置或手动输入。" }
                     return
                 }
                 if self.ssidField.text != network.ssid {
@@ -430,14 +430,14 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
     @objc private func forgetWiFiPassword() {
         do {
             try WiFiCredentials.forget(ssidField.text ?? ""); passwordField.text = ""
-            passwordStatus.text = "Saved password removed from this device"
-        } catch { passwordStatus.text = "Could not remove the saved password." }
+            passwordStatus.text = "已从本机删除已保存的密码"
+        } catch { passwordStatus.text = "无法删除已保存的密码。" }
     }
     private func saveSettings(_ config: ReceiverConfiguration) -> Bool {
         do { if needsNetworkDetails { try WiFiCredentials.save(config.password, for: config.ssid) } }
-        catch { statusLabel.text = "Could not save the Wi-Fi password securely. Please retry."; return false }
+        catch { statusLabel.text = "无法安全保存 Wi-Fi 密码，请重试。"; return false }
         if needsNetworkDetails {
-            passwordStatus.text = "Wi-Fi password saved in Keychain"
+            passwordStatus.text = "Wi-Fi 密码已存入钥匙串"
             UserDefaults.standard.set(config.ssid, forKey: "wifiSSID")
             UserDefaults.standard.set(Int(config.wifiChannel), forKey: "wifiChannel")
         }
@@ -451,11 +451,11 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             identity = try AccessoryIdentity(certificateChain: Data(contentsOf: folder.appendingPathComponent("certificate.p7b")),
                 leafCertificate: Data(contentsOf: folder.appendingPathComponent("leaf.cer")),
                 privateKeyX963: Data(contentsOf: folder.appendingPathComponent("private.x963")))
-            statusLabel.text = "Ready to connect"
-            log("Certificate and private key match; ECDSA challenge self-test passed")
+            statusLabel.text = "就绪，可连接"
+            log("证书与私钥匹配；ECDSA 自检通过")
         } catch {
-            statusLabel.text = "Local identity missing or invalid"; startButton.isEnabled = false
-            log("Add accessory authentication files to .local/Identity before building. Identity error: \(error.localizedDescription)")
+            statusLabel.text = "本地身份缺失或无效"; startButton.isEnabled = false
+            log("构建前请把附件认证文件放入 .local/Identity。身份错误：\(error.localizedDescription)")
         }
     }
     @objc private func toggleReceiver() {
@@ -464,16 +464,16 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             ipField.text = ReceiverConfiguration.personalHotspotAddress() ?? ReceiverConfiguration.localIPv4Addresses().first
         }
         guard let channel = needsNetworkDetails ? UInt8(channelField.text ?? "") : UInt8(36), (1...196).contains(channel) else {
-            revealSettings(); statusLabel.text = "Enter a Wi-Fi channel between 1 and 196."; return
+            revealSettings(); statusLabel.text = "请输入 1 到 196 之间的 Wi-Fi 信道。"; return
         }
         guard !needsNetworkDetails || openNetworkSwitch.isOn || !(passwordField.text ?? "").isEmpty else {
-            statusLabel.text = "Enter the Wi-Fi password, or select Open network if it has no password."
+            statusLabel.text = "请输入 Wi-Fi 密码；如为开放网络请勾选“开放网络”。"
             revealSettings(); passwordField.becomeFirstResponder(); return
         }
         let password = !needsNetworkDetails || openNetworkSwitch.isOn ? "" : (passwordField.text ?? "")
         if modeControl.selectedSegmentIndex == 2 {
             guard let identity, let target = remoteTarget else {
-                statusLabel.text = "Choose the iPad receiver first. Keep both devices on the same Wi-Fi."; return
+                statusLabel.text = "请先选择 iPad 接收器，并确保两台设备在同一 Wi-Fi。"; return
             }
             let config = ReceiverConfiguration(name: target.name, address: target.address,
                 ssid: ssidField.text ?? "", password: password, port: target.port,
@@ -485,14 +485,14 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             view.endEditing(true); running = true; modeControl.isEnabled = false; setEditing(false)
             receiverPicker.isEnabled = false; receiverBrowser.stop()
             UIApplication.shared.isIdleTimerDisabled = true
-            startButton.setTitle("Stop iPad connection", for: .normal)
-            log("Requesting this iPhone’s CarPlay on \(target.name) at \(target.address):\(target.port)")
+            startButton.setTitle("停止 iPad 连接", for: .normal)
+            log("正在请求本 iPhone 的 CarPlay 到 \(target.name)（\(target.address):\(target.port)）")
             sameDevice.start(configuration: config, identity: identity, expectsLocalControl: false)
             return
         }
         if modeControl.selectedSegmentIndex == 1 {
             guard let identity else { return }
-            var config = ReceiverConfiguration(name: nameField.text ?? "TDS Car Kit", address: ReceiverConfiguration.personalHotspotAddress() ?? ReceiverConfiguration.localIPv4Addresses().first ?? "127.0.0.1",
+            var config = ReceiverConfiguration(name: nameField.text ?? "CarPlay 车机", address: ReceiverConfiguration.personalHotspotAddress() ?? ReceiverConfiguration.localIPv4Addresses().first ?? "127.0.0.1",
                 ssid: ssidField.text ?? "", password: password, wifiChannel: channel, audioEnabled: audioSwitch.isOn,
                 deviceID: ReceiverConfiguration.persistentDeviceID())
             configureDisplay(&config)
@@ -502,8 +502,8 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             guard saveSettings(config) else { return }
             view.endEditing(true)
             running = true; modeControl.isEnabled = false; setEditing(false)
-            startButton.setTitle("Stop receiver", for: .normal)
-            statusLabel.text = "Starting local CarPlay receiver…"
+            startButton.setTitle("停止接收器", for: .normal)
+            statusLabel.text = "正在启动本机 CarPlay 接收器…"
             UIApplication.shared.isIdleTimerDisabled = true
             receiver.onListening = { [weak self] port in
                 guard let self, self.running else { return }
@@ -515,23 +515,23 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             return
         }
         guard let identity else { return }
-        var config = ReceiverConfiguration(name: nameField.text ?? "TDS Car Kit", address: ipField.text ?? "",
+        var config = ReceiverConfiguration(name: nameField.text ?? "CarPlay 车机", address: ipField.text ?? "",
             ssid: ssidField.text ?? "", password: password, wifiChannel: channel, audioEnabled: audioSwitch.isOn, deviceID: ReceiverConfiguration.persistentDeviceID())
         configureDisplay(&config)
         do { try config.validate(requiresWiFiCredentials: needsNetworkDetails) } catch {
             statusLabel.text = error.localizedDescription
-            log("Cannot start: \(error.localizedDescription)")
+            log("无法启动：\(error.localizedDescription)")
             revealSettings(); if config.ssid.isEmpty { ssidField.becomeFirstResponder() }
             return
         }
         guard saveSettings(config) else { return }
         view.endEditing(true)
-        running = true; modeControl.isEnabled = false; setEditing(false); startButton.setTitle("Stop receiver", for: .normal)
-        UIApplication.shared.isIdleTimerDisabled = true; statusLabel.text = "Starting native listener…"
+        running = true; modeControl.isEnabled = false; setEditing(false); startButton.setTitle("停止接收器", for: .normal)
+        UIApplication.shared.isIdleTimerDisabled = true; statusLabel.text = "正在启动本地监听…"
         receiver.onListening = { [weak self] port in
             guard let self, self.running else { return }
             var live = config; live.port = port
-            self.statusLabel.text = "Waiting for your iPhone"
+            self.statusLabel.text = "等待你的 iPhone"
             if self.bluetoothSetupSwitch.isOn { self.bluetooth.start(configuration: live) }
         }
         receiver.start(configuration: config, identity: identity)
@@ -545,8 +545,8 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         modeControl.isEnabled = true
         UIApplication.shared.isIdleTimerDisabled = false; setEditing(true)
         modeChanged()
-        statusLabel.text = identity == nil ? "Setup required" : "Disconnected"
-        log("Receiver stopped")
+        statusLabel.text = identity == nil ? "需要配置" : "已断开"
+        log("接收器已停止")
     }
     @objc private func modeChanged() {
         UserDefaults.standard.set(modeControl.selectedSegmentIndex, forKey: "connectionMode")
@@ -556,16 +556,16 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         receiverPicker.isHidden = !remote
         if remote {
             receiverPicker.menu = nil; receiverPicker.isEnabled = false
-            receiverPicker.setTitle("Searching for iPad receivers…", for: .normal)
+            receiverPicker.setTitle("正在搜索 iPad 接收器…", for: .normal)
             receiverBrowser.start()
         }
-        heading.text = remote ? "Connect to iPad" : local ? "CarPlay on this iPhone" : "Your CarPlay display"
-        explanation.text = remote ? "Choose your iPad and send CarPlay to its screen."
-            : local ? "Display CarPlay on this device." : "Navigation, music and touch control from your iPhone."
+        heading.text = remote ? "连接到 iPad" : local ? "在本机运行 CarPlay" : "CarPlay 显示器"
+        explanation.text = remote ? "选择 iPad 并把 CarPlay 投到它的屏幕。"
+            : local ? "在本设备上显示 CarPlay。" : "从 iPhone 提供导航、音乐与触控。"
         connectionHelp.text = remote
-            ? "Use the same Wi-Fi, or connect the iPad to this iPhone’s Personal Hotspot."
-            : local ? "Start CarPlay on this iPhone. Keep the app open while connected."
-            : "Start the display here, then open TDS Car Kit on your iPhone to connect."
+            ? "使用同一 Wi-Fi，或让 iPad 连接本 iPhone 的个人热点。"
+            : local ? "在本 iPhone 启动 CarPlay，连接期间保持 App 前台。"
+            : "先在这里启动显示器，再到 iPhone 上打开本应用进行连接。"
         driveRow.isHidden = remote
         hotspotNote.isHidden = !needsNetworkDetails
         networkButton.isHidden = !needsNetworkDetails || !canDetectWiFiName
@@ -578,8 +578,8 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         }
         passwordStatus.isHidden = !needsNetworkDetails; forgetPasswordButton.isHidden = !needsNetworkDetails
         startButton.isEnabled = identity != nil
-        startButton.setTitle(remote ? "Connect to iPad" : local ? "Start on this iPhone" : "Start CarPlay display", for: .normal)
-        statusLabel.text = identity == nil ? "Setup required" : remote ? "Choose your display" : "Ready"
+        startButton.setTitle(remote ? "连接到 iPad" : local ? "在本机启动" : "启动 CarPlay 显示器", for: .normal)
+        statusLabel.text = identity == nil ? "需要配置" : remote ? "选择显示器" : "就绪"
         refreshCurrentNetwork(requestPermission: false)
     }
     private func setEditing(_ value: Bool) {

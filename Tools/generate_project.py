@@ -18,11 +18,14 @@ for path in sources:
 identity = add('identity', 'isa = PBXFileReference; lastKnownFileType = folder; name = Identity; path = .local/Identity; sourceTree = "<group>";')
 refs.append(identity)
 resource = add('identity-build', f'isa = PBXBuildFile; fileRef = {identity};')
+assets = add('assets', 'isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = App/Assets.xcassets; sourceTree = "<group>";')
+refs.append(assets)
+assets_build = add('assets-build', f'isa = PBXBuildFile; fileRef = {assets};')
 product = add('product', 'isa = PBXFileReference; explicitFileType = wrapper.application; path = TDSCarKit.app; sourceTree = BUILT_PRODUCTS_DIR;')
 products = add('products', f'isa = PBXGroup; name = Products; children = ({product},); sourceTree = "<group>";')
 add('group', f'isa = PBXGroup; children = ({",".join(refs + [products])},); sourceTree = "<group>";')
 add('sources', f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ({",".join(builds)},); runOnlyForDeploymentPostprocessing = 0;')
-add('resources', f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({resource},); runOnlyForDeploymentPostprocessing = 0;')
+add('resources', f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ({resource},{assets_build},); runOnlyForDeploymentPostprocessing = 0;')
 add('frameworks', 'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;')
 common = {
 'PRODUCT_NAME':'TDSCarKit', 'PRODUCT_BUNDLE_IDENTIFIER':'local.tds.carkit', 'SWIFT_VERSION':'5.0',
@@ -30,6 +33,7 @@ common = {
 'SDKROOT':'iphoneos','SUPPORTED_PLATFORMS':'iphoneos iphonesimulator macosx', 'SUPPORTS_MACCATALYST':'YES',
 'SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD':'YES', 'DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER':'NO',
 'INFOPLIST_FILE':'App/Info.plist', 'GENERATE_INFOPLIST_FILE':'NO', 'CODE_SIGN_STYLE':'Automatic', 'CODE_SIGN_ENTITLEMENTS':'$(TDS_WIFI_ENTITLEMENTS)', 'TDS_WIFI_NAME_DETECTION':'NO',
+'ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon',
 'SWIFT_OBJC_BRIDGING_HEADER':'App/TDSCarKit-Bridging-Header.h',
 'HEADER_SEARCH_PATHS':'$(SRCROOT)/Sources/CTDSCarKitCrypto/include', 'CLANG_ENABLE_MODULES':'YES',
 'CLANG_ENABLE_OBJC_ARC':'YES',
