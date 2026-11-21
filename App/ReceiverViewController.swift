@@ -20,7 +20,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
     private let channelField = UITextField()
     private var channelRow: UIView!
     private let autoChannelSwitch = UISwitch()
-    private var autoChannelRow: UIView!
+    private var autoChannelRow: UIStackView!
     private let savedWifiButton = UIButton(type: .system)
     private let passwordToggle = UIButton(type: .system)
     private let openNetworkSwitch = UISwitch()
@@ -561,8 +561,8 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         if modeControl.selectedSegmentIndex == 1 {
             guard let identity else { return }
             var config = ReceiverConfiguration(name: nameField.text ?? "CarPlay 车机", address: ReceiverConfiguration.personalHotspotAddress() ?? ReceiverConfiguration.localIPv4Addresses().first ?? "127.0.0.1",
-                ssid: ssidField.text ?? "", password: password, wifiChannel: channel, audioEnabled: audioSwitch.isOn,
-                autoChannel: autoChannel, deviceID: ReceiverConfiguration.persistentDeviceID())
+                ssid: ssidField.text ?? "", password: password, wifiChannel: channel, autoChannel: autoChannel,
+                audioEnabled: audioSwitch.isOn, deviceID: ReceiverConfiguration.persistentDeviceID())
             configureDisplay(&config)
             do { try config.validate() } catch {
                 revealSettings(); statusLabel.text = error.localizedDescription; return
@@ -584,8 +584,8 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         }
         guard let identity else { return }
         var config = ReceiverConfiguration(name: nameField.text ?? "CarPlay 车机", address: ipField.text ?? "",
-            ssid: ssidField.text ?? "", password: password, wifiChannel: channel, audioEnabled: audioSwitch.isOn,
-            autoChannel: autoChannel, deviceID: ReceiverConfiguration.persistentDeviceID())
+            ssid: ssidField.text ?? "", password: password, wifiChannel: channel, autoChannel: autoChannel,
+            audioEnabled: audioSwitch.isOn, deviceID: ReceiverConfiguration.persistentDeviceID())
         configureDisplay(&config)
         do { try config.validate(requiresWiFiCredentials: needsNetworkDetails) } catch {
             statusLabel.text = error.localizedDescription
