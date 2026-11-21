@@ -4,10 +4,14 @@ import Security
 
 /// Per-network credentials stay on this device, accessible only while unlocked.
 enum WiFiCredentials {
+    private static let indexKey = "local.tds.carkit.wifiIndex"
     private static func query(_ ssid: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: "local.tds.carkit.wifi",
          kSecAttrAccount as String: ssid]
+    }
+    static func allSSIDs() -> [String] {
+        (UserDefaults.standard.stringArray(forKey: indexKey) ?? []).sorted()
     }
     static func password(for ssid: String) throws -> String? {
         guard !ssid.isEmpty else { return nil }
@@ -29,12 +33,17 @@ enum WiFiCredentials {
             status = SecItemAdd(query(ssid).merging(attributes) { _, value in value } as CFDictionary, nil)
         }
         guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+        var list = UserDefaults.standard.stringArray(forKey: indexKey) ?? []
+        if !list.contains(ssid) { list.append(ssid); UserDefaults.standard.set(list, forKey: indexKey) }
     }
     static func forget(_ ssid: String) throws {
         let status = SecItemDelete(query(ssid) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
         }
+        var list = UserDefaults.standard.stringArray(forKey: indexKey) ?? []
+        list.removeAll { $0 == ssid }
+        UserDefaults.standard.set(list, forKey: indexKey)
     }
 }
 

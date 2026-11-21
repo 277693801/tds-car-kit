@@ -4,6 +4,9 @@ import Darwin
 struct ReceiverConfiguration {
     var name = "TDS Car Kit"
     static let discoveryType = "_tds-carkit._tcp."
+    // 中国大陆可用的 Wi-Fi 信道（2.4GHz 1-13 + 5GHz UNII-1/2/3）。
+    static let chinaChannels: [UInt8] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+                                          36, 40, 44, 48, 52, 56, 60, 64, 149, 153, 157, 161, 165]
     var address: String
     var ssid: String
     var password: String
@@ -11,6 +14,7 @@ struct ReceiverConfiguration {
     var width = 1280
     var height = 720
     var wifiChannel: UInt8 = 36
+    var autoChannel = false
     var audioEnabled = true
     var rightHandDrive = true
     let deviceID: String

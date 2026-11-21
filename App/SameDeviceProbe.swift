@@ -19,6 +19,8 @@ final class SameDeviceProbe {
     private var requested = false
     private var controlConnected = false
     private var expectsLocalControl = true
+    private var channelList: [UInt8] = []
+    private var channelIndex = 0
     var onLog: ((String) -> Void)?
     var onFinished: ((String) -> Void)?
     var onStage: ((String) -> Void)?
@@ -26,6 +28,8 @@ final class SameDeviceProbe {
     func start(configuration: ReceiverConfiguration, identity: AccessoryIdentity, expectsLocalControl: Bool = true) {
         stop(); active = true; self.identity = identity; self.configuration = configuration
         self.expectsLocalControl = expectsLocalControl
+        self.channelList = configuration.autoChannel ? ReceiverConfiguration.chinaChannels : [configuration.wifiChannel]
+        self.channelIndex = 0
         let run = generation
         transport.onData = { [weak self] data in self?.receive(data) }
         do {
@@ -45,9 +49,10 @@ final class SameDeviceProbe {
                 guard let self, self.active, self.generation == run, !self.requested else { return }
                 self.finish("Session startup timed out (link=\(self.linked), authenticated=\(self.authenticated), identified=\(self.identified))")
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 45) { [weak self] in
+            let controlTimeout = configuration.autoChannel ? TimeInterval(self.channelList.count) * 3.0 + 12.0 : 45.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + controlTimeout) { [weak self] in
                 guard let self, self.active, self.generation == run, self.expectsLocalControl, !self.controlConnected else { return }
-                self.finish("No CarPlay control connection received. Check the Wi-Fi name, password and channel, then retry.")
+                self.finish("未收到 CarPlay 控制连接；已尝试 \(self.channelList.count) 个信道。请检查 Wi-Fi 名称/密码后重试。")
             }
         } catch { finish("Same-device transport failed: \(error.localizedDescription)") }
     }
@@ -55,6 +60,7 @@ final class SameDeviceProbe {
         active = false; generation = UUID(); transport.stop(); transport.onData = nil; parser = IAP2Parser()
         identity = nil; configuration = nil; messageBytes = Data(); sequence = 0x10; acknowledgement = 0
         session = 1; lastPayloadSequence = nil; linked = false; authenticated = false; identified = false; requested = false; controlConnected = false
+        channelList = []; channelIndex = 0
     }
     func didConnectControl() {
         guard active else { return }
@@ -65,6 +71,15 @@ final class SameDeviceProbe {
         let wifi = try AccessoryMessages.WiFi(ssid: configuration.ssid, password: configuration.password, channel: configuration.wifiChannel)
         try send(AccessoryMessages.startSession(address: configuration.address, port: configuration.port,
             deviceID: configuration.deviceID, wifi: wifi))
+    }
+    private func requestSessionWithNextChannel() throws {
+        guard var configuration = configuration else { return }
+        if !channelList.isEmpty {
+            configuration.wifiChannel = channelList[channelIndex % channelList.count]
+            channelIndex += 1
+        }
+        try requestSession(configuration)
+        onLog?("CarPlay session request (channel \(configuration.wifiChannel))")
     }
     private func stage(_ message: String) { onLog?(message); onStage?(message) }
     private func finish(_ message: String) { onLog?(message); stop(); onFinished?(message) }
@@ -136,20 +151,22 @@ final class SameDeviceProbe {
                 }
             }
             if controlConnected || (!expectsLocalControl && requested) { return }
-            try requestSession(configuration)
-            if !requested && expectsLocalControl {
+            try requestSessionWithNextChannel()
+            if expectsLocalControl {
                 let run = generation
-                for delay in [3.0, 6.0, 9.0] {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                func scheduleRetry() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
                         guard let self, self.active, self.generation == run, !self.controlConnected else { return }
-                        do { try self.requestSession(configuration) }
-                        catch { self.finish("Session retry failed: \(error)") }
+                        do { try self.requestSessionWithNextChannel() }
+                        catch { self.finish("Session retry failed: \(error)"); return }
+                        scheduleRetry()
                     }
                 }
+                scheduleRetry()
             }
             requested = true
             stage(expectsLocalControl
-                ? "CarPlay session requested on \(configuration.address):\(configuration.port); awaiting TCP connection"
+                ? (configuration.autoChannel ? "已请求 CarPlay 会话（自动尝试 \(channelList.count) 个信道）· 等待 TCP 连接" : "已请求 CarPlay 会话（\(configuration.address):\(configuration.port)）· 等待 TCP 连接")
                 : "CarPlay requested on \(configuration.name) (\(configuration.address):\(configuration.port)). Keep this app open and check the iPad display.")
         default: onLog?(String(format: "Unhandled accessory message 0x%04X", message.id))
         }

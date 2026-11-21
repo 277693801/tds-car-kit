@@ -18,6 +18,11 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
     private let ssidField = UITextField()
     private let passwordField = UITextField()
     private let channelField = UITextField()
+    private var channelRow: UIView!
+    private let autoChannelSwitch = UISwitch()
+    private var autoChannelRow: UIView!
+    private let savedWifiButton = UIButton(type: .system)
+    private let passwordToggle = UIButton(type: .system)
     private let openNetworkSwitch = UISwitch()
     private let audioSwitch = UISwitch()
     private let driveControl = UISegmentedControl(items: ["左舵", "右舵"])
@@ -91,12 +96,18 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         ssidField.addTarget(self, action: #selector(loadWiFiPassword), for: .editingDidEnd)
         channelField.text = String(UserDefaults.standard.object(forKey: "wifiChannel") as? Int ?? 36)
         channelField.keyboardType = .numberPad
+        channelRow = field(channelField, title: "Wi-Fi 信道")
         networkFields = [field(nameField, title: "接收器名称"), field(ipField, title: "本机 Wi-Fi IP 地址"),
             field(ssidField, title: "当前连接的 Wi-Fi 名称"), field(passwordField, title: "Wi-Fi 密码"),
-            field(channelField, title: "Wi-Fi 信道")]
+            channelRow]
         let openLabel = UILabel(); openLabel.text = "开放网络（无密码）"; openLabel.font = .preferredFont(forTextStyle: .footnote)
         let openRow = UIStackView(arrangedSubviews: [openLabel, openNetworkSwitch]); openRow.spacing = 12
         networkFields.append(openRow)
+        let autoLabel = UILabel(); autoLabel.text = "自动尝试信道（中国大陆全部信道）"; autoLabel.font = .preferredFont(forTextStyle: .footnote)
+        autoChannelSwitch.isOn = UserDefaults.standard.bool(forKey: "autoChannel")
+        autoChannelSwitch.addTarget(self, action: #selector(autoChannelChanged), for: .valueChanged)
+        autoChannelRow = UIStackView(arrangedSubviews: [autoLabel, autoChannelSwitch]); autoChannelRow.spacing = 12
+        networkFields.append(autoChannelRow)
         audioSwitch.isOn = UserDefaults.standard.object(forKey: "speakerAudio") as? Bool ?? true
         let audioLabel = UILabel(); audioLabel.text = "在本机播放音频"; audioLabel.font = .preferredFont(forTextStyle: .footnote)
         let audioRow = UIStackView(arrangedSubviews: [audioLabel, audioSwitch]); audioRow.spacing = 12
@@ -153,6 +164,10 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         orientationStack.axis = .vertical; orientationStack.spacing = 8
         orientationRow = orientationStack; settingsStack.insertArrangedSubview(orientationStack, at: 2)
         passwordField.isSecureTextEntry = true
+        passwordToggle.setImage(UIImage(systemName: "eye"), for: .normal)
+        passwordToggle.addTarget(self, action: #selector(togglePasswordVisibility), for: .touchUpInside)
+        passwordField.rightView = passwordToggle
+        passwordField.rightViewMode = .always
         ipField.keyboardType = .decimalPad
         let note = UILabel(); note.numberOfLines = 0; note.font = .preferredFont(forTextStyle: .footnote); note.textColor = .secondaryLabel
         note.text = "Wi-Fi 密码会在启动时安全存入本机钥匙串，不会写入日志。"
@@ -162,6 +177,12 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         passwordStatus.textColor = .secondaryLabel
         forgetPasswordButton.setTitle("忘记已保存的 Wi-Fi 密码", for: .normal)
         forgetPasswordButton.addTarget(self, action: #selector(forgetWiFiPassword), for: .touchUpInside)
+        savedWifiButton.setTitle("已保存的 Wi-Fi", for: .normal)
+        savedWifiButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        savedWifiButton.contentHorizontalAlignment = .leading
+        savedWifiButton.showsMenuAsPrimaryAction = true
+        refreshSavedWifiMenu()
+        settingsStack.addArrangedSubview(savedWifiButton)
         settingsStack.addArrangedSubview(passwordStatus); settingsStack.addArrangedSubview(forgetPasswordButton)
         startButton.setTitle("启动接收器", for: .normal)
         startButton.setTitleColor(.white, for: .normal)
@@ -215,7 +236,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
                     self.displayedVideo = true; self.statusLabel.text = "正在接收 CarPlay 视频"
                     self.fullscreenButton.isHidden = false
                     self.log("视频已送达本地显示层")
-                    if UIDevice.current.userInterfaceIdiom == .pad { self.showFullscreen() }
+                    self.showFullscreen()
                 }
             } catch { self.log("视频显示错误：\(error)") }
         }
@@ -321,8 +342,11 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         videoHeight.isActive = true
     }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        guard fullscreenContainer != nil, UIDevice.current.userInterfaceIdiom == .pad else { return .all }
-        return orientationControl.selectedSegmentIndex == 1 ? .portrait : .landscape
+        guard fullscreenContainer != nil else { return .all }
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return orientationControl.selectedSegmentIndex == 1 ? .portrait : .landscape
+        }
+        return .landscape
     }
     @objc private func showFullscreen() {
         guard displayedVideo, fullscreenContainer == nil else { return }
@@ -349,13 +373,17 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         NSLayoutConstraint.activate(fullscreenConstraints)
         navigationController?.setNavigationBarHidden(true, animated: false)
         setNeedsStatusBarAppearanceUpdate(); setNeedsUpdateOfHomeIndicatorAutoHidden()
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            if #available(iOS 16.0, *) {
-                setNeedsUpdateOfSupportedInterfaceOrientations()
-                view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations)) { [weak self] _ in
-                    self?.log("旋转 iPad 到所选方向以全屏显示")
-                }
+        if #available(iOS 16.0, *) {
+            setNeedsUpdateOfSupportedInterfaceOrientations()
+            view.window?.windowScene?.requestGeometryUpdate(.iOS(interfaceOrientations: supportedInterfaceOrientations)) { [weak self] _ in
+                self?.log("旋转设备到全屏方向")
             }
+        } else {
+            let target: UIInterfaceOrientation = UIDevice.current.userInterfaceIdiom == .pad
+                ? (orientationControl.selectedSegmentIndex == 1 ? .portrait : .landscapeRight)
+                : .landscapeRight
+            UIDevice.current.setValue(target.rawValue, forKey: "orientation")
+            UIViewController.attemptRotationToDeviceOrientation()
         }
     }
     @objc private func showConnectionSettings() { hideFullscreen(); revealSettings() }
@@ -368,6 +396,9 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         navigationController?.setNavigationBarHidden(false, animated: false)
         if #available(iOS 16.0, *) {
             setNeedsUpdateOfSupportedInterfaceOrientations()
+        } else {
+            UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+            UIViewController.attemptRotationToDeviceOrientation()
         }
         setNeedsStatusBarAppearanceUpdate(); setNeedsUpdateOfHomeIndicatorAutoHidden()
     }
@@ -384,12 +415,15 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         } catch { passwordStatus.text = "无法读取已保存的 Wi-Fi 密码，请在下方输入。" }
     }
     private func refreshNetworkSummary() {
-        if UIDevice.current.userInterfaceIdiom == .phone, ReceiverConfiguration.personalHotspotAddress() != nil {
-            let saved = !(ssidField.text ?? "").isEmpty && (!(passwordField.text ?? "").isEmpty || openNetworkSwitch.isOn)
-            networkSummary.text = saved ? "检测到个人热点 · CarPlay 配置已就绪" : "检测到个人热点 · 请先在设置中保存 Wi-Fi 配置"
-        } else if needsNetworkDetails, let ssid = ssidField.text, !ssid.isEmpty {
-            networkSummary.text = "CarPlay 网络：\(ssid)"
-        } else { networkSummary.text = "你的 iPhone 将以“\(nameField.text ?? "CarPlay 车机")”找到此显示器。" }
+        let address = ReceiverConfiguration.personalHotspotAddress() ?? ReceiverConfiguration.localIPv4Addresses().first
+        let hotspot = UIDevice.current.userInterfaceIdiom == .phone && ReceiverConfiguration.personalHotspotAddress() != nil
+        if hotspot {
+            networkSummary.text = "个人热点已开启 · 本机地址：\(address ?? "未知")"
+        } else if let ssid = ssidField.text, !ssid.isEmpty {
+            networkSummary.text = "当前 Wi-Fi：\(ssid) · 本机地址：\(address ?? "未知")"
+        } else {
+            networkSummary.text = "请填写当前 Wi-Fi 名称 · 本机地址：\(address ?? "未知")"
+        }
     }
     @objc private func detectNetwork() { refreshCurrentNetwork(requestPermission: true) }
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -431,7 +465,33 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         do {
             try WiFiCredentials.forget(ssidField.text ?? ""); passwordField.text = ""
             passwordStatus.text = "已从本机删除已保存的密码"
+            refreshSavedWifiMenu()
         } catch { passwordStatus.text = "无法删除已保存的密码。" }
+    }
+    @objc private func togglePasswordVisibility() {
+        passwordField.isSecureTextEntry.toggle()
+        passwordToggle.setImage(UIImage(systemName: passwordField.isSecureTextEntry ? "eye" : "eye.slash"), for: .normal)
+    }
+    @objc private func autoChannelChanged() {
+        UserDefaults.standard.set(autoChannelSwitch.isOn, forKey: "autoChannel")
+        channelRow.isHidden = autoChannelSwitch.isOn
+        channelField.isEnabled = !autoChannelSwitch.isOn
+    }
+    private func refreshSavedWifiMenu() {
+        let ssids = WiFiCredentials.allSSIDs()
+        savedWifiButton.isEnabled = !ssids.isEmpty
+        savedWifiButton.menu = UIMenu(title: "已保存的 Wi-Fi", children: ssids.map { ssid in
+            UIAction(title: ssid) { [weak self] _ in self?.applySavedWiFi(ssid) }
+        })
+    }
+    private func applySavedWiFi(_ ssid: String) {
+        ssidField.text = ssid
+        if let saved = try? WiFiCredentials.password(for: ssid) {
+            passwordField.text = saved ?? ""
+            openNetworkSwitch.isOn = (saved ?? "").isEmpty
+        }
+        passwordStatus.text = "已选择 \(ssid)"
+        refreshNetworkSummary()
     }
     private func saveSettings(_ config: ReceiverConfiguration) -> Bool {
         do { if needsNetworkDetails { try WiFiCredentials.save(config.password, for: config.ssid) } }
@@ -440,6 +500,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             passwordStatus.text = "Wi-Fi 密码已存入钥匙串"
             UserDefaults.standard.set(config.ssid, forKey: "wifiSSID")
             UserDefaults.standard.set(Int(config.wifiChannel), forKey: "wifiChannel")
+            refreshSavedWifiMenu()
         }
         UserDefaults.standard.set(audioSwitch.isOn, forKey: "speakerAudio")
         if modeControl.selectedSegmentIndex != 2 { UserDefaults.standard.set(config.name, forKey: "receiverName") }
@@ -463,8 +524,15 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         if !running, modeControl.selectedSegmentIndex != 2 {
             ipField.text = ReceiverConfiguration.personalHotspotAddress() ?? ReceiverConfiguration.localIPv4Addresses().first
         }
-        guard let channel = needsNetworkDetails ? UInt8(channelField.text ?? "") : UInt8(36), (1...196).contains(channel) else {
-            revealSettings(); statusLabel.text = "请输入 1 到 196 之间的 Wi-Fi 信道。"; return
+        let autoChannel = autoChannelSwitch.isOn && modeControl.selectedSegmentIndex != 2
+        let channel: UInt8
+        if autoChannel {
+            channel = ReceiverConfiguration.chinaChannels.first ?? 36
+        } else {
+            guard let entered = needsNetworkDetails ? UInt8(channelField.text ?? "") : UInt8(36), (1...196).contains(entered) else {
+                revealSettings(); statusLabel.text = "请输入 1 到 196 之间的 Wi-Fi 信道。"; return
+            }
+            channel = entered
         }
         guard !needsNetworkDetails || openNetworkSwitch.isOn || !(passwordField.text ?? "").isEmpty else {
             statusLabel.text = "请输入 Wi-Fi 密码；如为开放网络请勾选“开放网络”。"
@@ -477,7 +545,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             }
             let config = ReceiverConfiguration(name: target.name, address: target.address,
                 ssid: ssidField.text ?? "", password: password, port: target.port,
-                wifiChannel: channel, audioEnabled: false, deviceID: target.deviceID)
+                wifiChannel: channel, autoChannel: false, audioEnabled: false, deviceID: target.deviceID)
             do { try config.validate(requiresLocalAddress: false) } catch {
                 revealSettings(); statusLabel.text = error.localizedDescription; return
             }
@@ -494,7 +562,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             guard let identity else { return }
             var config = ReceiverConfiguration(name: nameField.text ?? "CarPlay 车机", address: ReceiverConfiguration.personalHotspotAddress() ?? ReceiverConfiguration.localIPv4Addresses().first ?? "127.0.0.1",
                 ssid: ssidField.text ?? "", password: password, wifiChannel: channel, audioEnabled: audioSwitch.isOn,
-                deviceID: ReceiverConfiguration.persistentDeviceID())
+                autoChannel: autoChannel, deviceID: ReceiverConfiguration.persistentDeviceID())
             configureDisplay(&config)
             do { try config.validate() } catch {
                 revealSettings(); statusLabel.text = error.localizedDescription; return
@@ -516,7 +584,8 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         }
         guard let identity else { return }
         var config = ReceiverConfiguration(name: nameField.text ?? "CarPlay 车机", address: ipField.text ?? "",
-            ssid: ssidField.text ?? "", password: password, wifiChannel: channel, audioEnabled: audioSwitch.isOn, deviceID: ReceiverConfiguration.persistentDeviceID())
+            ssid: ssidField.text ?? "", password: password, wifiChannel: channel, audioEnabled: audioSwitch.isOn,
+            autoChannel: autoChannel, deviceID: ReceiverConfiguration.persistentDeviceID())
         configureDisplay(&config)
         do { try config.validate(requiresWiFiCredentials: needsNetworkDetails) } catch {
             statusLabel.text = error.localizedDescription
@@ -573,9 +642,14 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         orientationRow.isHidden = remote || UIDevice.current.userInterfaceIdiom != .pad
         bluetoothSetupRow.isHidden = local || remote
         networkFields.enumerated().forEach { index, field in
-            field.isHidden = ((local || remote) && index < 2) || (remote && index == 6)
-                || (!needsNetworkDetails && ((2...5).contains(index) || index == 7))
+            let networkDetail = [2, 3, 4, 5, 6, 8].contains(index)
+            field.isHidden = ((local || remote) && index < 2) || (remote && index == 7) || (!needsNetworkDetails && networkDetail)
         }
+        if autoChannelSwitch.isOn {
+            channelRow.isHidden = true
+            channelField.isEnabled = false
+        }
+        savedWifiButton.isHidden = !needsNetworkDetails
         passwordStatus.isHidden = !needsNetworkDetails; forgetPasswordButton.isHidden = !needsNetworkDetails
         startButton.isEnabled = identity != nil
         startButton.setTitle(remote ? "连接到 iPad" : local ? "在本机启动" : "启动 CarPlay 显示器", for: .normal)
@@ -591,6 +665,9 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         networkButton.isEnabled = value
         bluetoothSetupSwitch.isEnabled = value
         forgetPasswordButton.isEnabled = value
+        autoChannelSwitch.isEnabled = value
+        passwordToggle.isEnabled = value
+        if value { refreshSavedWifiMenu() } else { savedWifiButton.isEnabled = false }
     }
     @objc private func foregrounded() {
         guard !running else { return }
