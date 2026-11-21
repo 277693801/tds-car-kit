@@ -5,6 +5,7 @@ import CoreLocation
 final class ReceiverViewController: UIViewController, CLLocationManagerDelegate {
     private let receiver = NativeReceiver()
     private let browserBridge = BrowserBridge()
+    private let keepAlive = BackgroundKeepAlive()
     private let bluetooth = BLEBootstrap()
     private let sameDevice = SameDeviceProbe()
     private let controlBrowser = CarPlayControlBrowser()
@@ -553,6 +554,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             view.endEditing(true); running = true; modeControl.isEnabled = false; setEditing(false)
             receiverPicker.isEnabled = false; receiverBrowser.stop()
             UIApplication.shared.isIdleTimerDisabled = true
+            keepAlive.start()
             startButton.setTitle("停止 iPad 连接", for: .normal)
             log("正在请求本 iPhone 的 CarPlay 到 \(target.name)（\(target.address):\(target.port)）")
             sameDevice.start(configuration: config, identity: identity, expectsLocalControl: false)
@@ -577,6 +579,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
             startButton.setTitle("停止接收器", for: .normal)
             statusLabel.text = "正在启动本机 CarPlay 接收器…"
             UIApplication.shared.isIdleTimerDisabled = true
+            keepAlive.start()
             receiver.onListening = { [weak self] port in
                 guard let self, self.running else { return }
                 var live = config; live.port = port
@@ -601,6 +604,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         view.endEditing(true)
         running = true; modeControl.isEnabled = false; setEditing(false); startButton.setTitle("停止接收器", for: .normal)
         UIApplication.shared.isIdleTimerDisabled = true; statusLabel.text = "正在启动本地监听…"
+        keepAlive.start()
         receiver.onListening = { [weak self] port in
             guard let self, self.running else { return }
             var live = config; live.port = port
@@ -613,6 +617,7 @@ final class ReceiverViewController: UIViewController, CLLocationManagerDelegate 
         hideFullscreen(); fullscreenButton.isHidden = true
         displayedVideo = false; videoSurface.reset(); videoSurface.isHidden = true
         browserBridge.reset()
+        keepAlive.stop()
         running = false; receiver.onListening = nil; bluetooth.stop(); sameDevice.stop(); controlBrowser.stop(); receiver.stop()
         receiverBrowser.stop()
         modeControl.isEnabled = true

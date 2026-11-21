@@ -24,6 +24,7 @@
 		6AE9AA281CEF3A70B5513785 /* Sources/TDSCarKitCore/Vendor/BigInt/Words and Bits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B503ABE104E93ED984C3E16 /* Sources/TDSCarKitCore/Vendor/BigInt/Words and Bits.swift */; };
 		7280E6D2A3CAA1786B23A020 /* Sources/TDSCarKitCore/Vendor/BigInt/Data Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB86FB559E24F8FB77CEB0C /* Sources/TDSCarKitCore/Vendor/BigInt/Data Conversion.swift */; };
 		75A29E53D8539252B3301E6E /* App/AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17EB8379178EF804B1C9770 /* App/AppDelegate.swift */; };
+		D1C0F3DD0BE894216FC7E7D7 /* App/BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 575E3399A1442CCAC5A79931 /* App/BackgroundKeepAlive.swift */; };
 		794521C8CED59B035ABCCC7C /* Sources/TDSCarKitCore/Vendor/BigInt/Prime Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2890B6A8DF0519B92C2D9EFA /* Sources/TDSCarKitCore/Vendor/BigInt/Prime Test.swift */; };
 		7A8A1FB0332CFF208DADE7D3 /* Sources/TDSCarKitCore/RTSP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 005ED4E0A19945F555BFA56E /* Sources/TDSCarKitCore/RTSP.swift */; };
 		7FD40659FC7A49ACDD1DE35E /* Sources/CTDSCarKitCrypto/TDSCarKitCrypto.c in Sources */ = {isa = PBXBuildFile; fileRef = FEB6265A3FB950679A3B4841 /* Sources/CTDSCarKitCrypto/TDSCarKitCrypto.c */; };
@@ -114,6 +115,7 @@
 		E2F75EB285D7A8897999A127 /* Sources/TDSCarKitCore/Vendor/BigInt/GCD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TDSCarKitCore/Vendor/BigInt/GCD.swift; sourceTree = "<group>"; };
 		E661249A94C046F9891E114F /* Sources/TDSCarKitCore/Vendor/BigInt/Bitwise Ops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/TDSCarKitCore/Vendor/BigInt/Bitwise Ops.swift"; sourceTree = "<group>"; };
 		F17EB8379178EF804B1C9770 /* App/AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegate.swift; sourceTree = "<group>"; };
+		575E3399A1442CCAC5A79931 /* App/BackgroundKeepAlive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/BackgroundKeepAlive.swift; sourceTree = "<group>"; };
 		F726A65F45AF199AB43C5211 /* Sources/TDSCarKitCore/Vendor/BigInt/Division.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TDSCarKitCore/Vendor/BigInt/Division.swift; sourceTree = "<group>"; };
 		FA8531A1754681DF650ED717 /* Sources/TDSCarKitCore/BLEFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TDSCarKitCore/BLEFrame.swift; sourceTree = "<group>"; };
 		FEB6265A3FB950679A3B4841 /* Sources/CTDSCarKitCrypto/TDSCarKitCrypto.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = Sources/CTDSCarKitCrypto/TDSCarKitCrypto.c; sourceTree = "<group>"; };
@@ -135,6 +137,7 @@
 			children = (
 				88EE41E90E802F76407F8E4E /* App/AirPlayCredentials.swift */,
 				F17EB8379178EF804B1C9770 /* App/AppDelegate.swift */,
+				575E3399A1442CCAC5A79931 /* App/BackgroundKeepAlive.swift */,
 				0FC063C47C1B6FBDC0FB3C93 /* App/BLEBootstrap.swift */,
 				2537E300FE13185CA1E35981 /* App/BrowserBridge.swift */,
 				BF3A69A086EFDEE36CFCEF7B /* App/CarPlayAudio.swift */,
@@ -263,6 +266,7 @@
 			files = (
 				82A602F72884956279B3793B /* App/AirPlayCredentials.swift in Sources */,
 				75A29E53D8539252B3301E6E /* App/AppDelegate.swift in Sources */,
+				D1C0F3DD0BE894216FC7E7D7 /* App/BackgroundKeepAlive.swift in Sources */,
 				9AA8500AA5EED0F288E24FE1 /* App/BLEBootstrap.swift in Sources */,
 				D11C6ABF50C922C2FE6BEAAE /* App/BrowserBridge.swift in Sources */,
 				F18EC0E491B6E27F5FB2FFCA /* App/CarPlayAudio.swift in Sources */,
